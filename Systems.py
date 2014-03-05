@@ -49,6 +49,10 @@ class InputSystem(System):
 			elif (key == pygame.K_RIGHT):
 				self.world.send_event("MovePlayer", dir="Right")
 
+			elif (key == pygame.K_SPACE):
+				self.world.send_event("MobFireLaser", mob=None)
+				self.pressed.pop(key)
+
 			elif (key == pygame.K_y):
 				print(self.world.clock.get_fps())
 
@@ -89,14 +93,93 @@ class MapSystem(System):
 			self.player = Player() or something
 		"""
 		self.player = self.world.create_entity()
+		self.player.add_component(Type(name="badger"))
 		self.player.add_component(Controllable())
-		self.player.add_component(Position(x=100, y=100))
+		self.player.add_component(Position(x=200, y=600))
 		self.player.add_component(Size(width=25, height=40))
 		self.player.add_component(Color(r=0, g=0, b=0))
 		self.player.add_component(Visible())
 
 	def load_mobs(self):
-		print("stubbed")
+		self.mobs = list()
+		m = self.world.create_entity()
+		m.add_component(Type(name="mob"))
+		m.add_component(Position(x=100, y=100))
+		m.add_component(Size(width=20, height=20))
+		m.add_component(Color(r=20, g=20, b=20))
+		m.add_component(Visible())
+		m.add_component(Hostile())
+
+class AttackSystem(System):
+	def __init__(self, world):
+		super(AttackSystem, self).__init__(world)
+
+		self.hostiles = list()
+		self.player = None
+
+		self.world.subscribe_event("MobFireLaser", self)
+		self.world.subscribe_event("ComponentAdded", self) # really should add a helper for component adding
+
+	def receive(self, event_type, event):
+		if event_type == "ComponentAdded":
+			if event.entity.type.name == "mob":
+				self.hostiles.append(event.entity)
+			elif event.entity.type.name == "badger":
+				self.player = event.entity
+
+		elif event_type == "MobFireLaser":
+			if event.mob == None:
+				self.fire_all_lasers()
+
+		elif event_type == "PlayerAttack":
+			pass
+
+	def fire_all_lasers(self):
+		print("IMMA FIRING MY LASER")
+		for mob in self.hostiles:
+			self.fire_laser(mob)
+
+	def fire_laser(self, mob):
+		center = (mob.position.x+(mob.size.width/2), mob.position.y+(mob.size.height/2))
+		self.create_laser(start=center, direction=(0,1)) # in sdl coordinates it is downwards
+
+	def create_laser(self, start, direction, size=(4,18)):
+		b = self.world.create_entity()
+		b.add_component(Type(name="laser"))
+		b.add_component(Size(width=size[0], height=size[1]))
+		b.add_component(Position(x=start[0]-(size[0]/2), y=start[1]-(size[1]/2)))
+		b.add_component(Velocity(x=direction[0], y=direction[1]))
+		b.add_component(Color(r=255, g=0, b=0))
+		b.add_component(Visible())
+		b.add_component(Collidable())
+
+class LaserSystem(System):
+	def __init__(self, world):
+		super(LaserSystem, self).__init__(world)
+
+		self.world.subscribe_event("ComponentAdded", self)
+
+		self.lasers = list()
+
+	def receive(self, event_type, event):
+		if event_type == "ComponentAdded":
+			if event.compname == "type" and event.entity.type.name == "laser":
+				self.lasers.append(event.entity)
+
+	def update(self, dt):
+		for laser in self.lasers:
+			self.move_laser(laser)
+			# see, there needs to be some global way of accessing other systems' data 
+			# perhaps the world object could just have a dict called "globaldata" and systems can add to it
+			# could even then put mutexes on it if i wanted to run the systems in different threads or something stupid
+
+	def move_laser(self, laser):
+		# not sure if i want this to be in the MovementSystem or if that should just be for player and maybe mob movement
+		laser.position.x += laser.velocity.x
+		laser.position.y += laser.velocity.y
+
+		#self.world.send_event("MovedEntity", laser)
+		# rather than above I think I'll just have a collision system that checks all objects for collisions at the end of each frame
 
 class MovementSystem(System):
 	def __init__(self, world):
@@ -116,6 +199,8 @@ class MovementSystem(System):
 			self.move_player(event.dir)
 	
 	def move_player(self, dir):
+		# this needs to be changed probably at the same time as the input system
+		# so that we move based on dt. 
 		if dir == "Up":
 			self.player.position.y -= 1.5
 		elif dir == "Down":
@@ -179,4 +264,4 @@ class RenderSystem(System):
 		pygame.display.flip()
 
 #systems = (InputSystem, MovementSystem, RenderSystem)
-systems = (InputSystem, MapSystem, MovementSystem, RenderSystem)
+systems = (InputSystem, MapSystem, AttackSystem, LaserSystem, MovementSystem, RenderSystem)

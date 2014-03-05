@@ -5,6 +5,8 @@ class Entity(object):
 		self.world = world
 		self.components = dict()
 
+		self.is_dead = False
+
 	def add_component(self, comp):
 		self.components[comp.COMPNAME] = comp
 		self.world.register_component(self, comp)
