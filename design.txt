@@ -1,0 +1,39 @@
+game "board"
+	rectangle, taller than wide
+
+	desert/savannah motif
+
+	map is same width as board, but is much longer
+	goal is to get to the end of the map
+		since you are a honey badger you don't give a fuck and can walk past most enemies if you want
+		maybe some enemies/mini bosses (king cobras?) you have to defeat before you can advance?
+
+you: 
+	- honey badger
+	- square starting at bottom of screen
+	- you can move anywhere on the screen, with arrow keys
+
+	- it would be too easy if you had laser beams too, so you just have a melee attack
+	- special avoid lasers move: burrow. 
+
+	- since you are a badass you can take several hits before you die i.e. you have health
+	- restore health by devouring the corpses of other animals
+
+other animals:
+	- cobras
+	- rats, lizards, birds
+	- jackals, lions, cheetas
+		- can't kill
+		- can scare off with melee attacks because you're a motherfucking honey badger and you don't give a shit
+	- beehives 
+		- powerup if you break
+		- bees don't hurt you but they do hurt enemies?
+
+	all besides bees fire lasers at you, some if provoked (smaller animals, cheetahs and lions), some on sight (cobras, jackals)
+
+	- mini bosses?
+
+	- for now they are just different colored rectangles, i guess
+
+controls:
+	arrow keys, space bar

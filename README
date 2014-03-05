@@ -1,0 +1,3 @@
+this is a silly bullet-hell-kindof-style game prototype created for this rutgers game dev club that is apparently a thing now. i made this in three-ish days from scratch, including the entity-component system.
+
+controls were required to use only four keys, sprites could only be rectangles or circles.
