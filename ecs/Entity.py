@@ -11,6 +11,10 @@ class Entity(object):
 		self.components[comp.COMPNAME] = comp
 		self.world.register_component(self, comp)
 
+	def remove_component(self, comp):
+		if self.components.get(comp.COMPNAME):
+			self.components.pop(comp.COMPNAME)
+
 	def has_component(self, comp_type):
 		if self.components.get(comp_type.name, False):
 			return True

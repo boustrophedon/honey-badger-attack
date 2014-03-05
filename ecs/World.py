@@ -12,6 +12,8 @@ class World(object):
 		self.components = defaultdict(set)
 		self.systems = list()
 
+		self.globaldata = dict() # i don't really like this but I don't see a better way
+
 		self.event_subs = defaultdict(list)
 
 		self.clock = pygame.time.Clock()

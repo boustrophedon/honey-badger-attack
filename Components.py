@@ -8,7 +8,7 @@ from ecs.Component import ComponentFactory
 Type = ComponentFactory("type", ("name",))
 
 Position = ComponentFactory("position", ("x", "y"))
-Velocity = ComponentFactory("velocity", ("x", "y"))
+MoveSpeed = ComponentFactory("movespeed", ("x", "y"))
 Color = ComponentFactory("color", ("r","g","b"))
 Size = ComponentFactory("size", ("height", "width"))
 Visible = ComponentFactory("visible", tuple())
@@ -20,4 +20,4 @@ Controllable = ComponentFactory("controllable", tuple())
 Collidable = ComponentFactory("collidable", tuple())
 
 Hostile = ComponentFactory("hostile", tuple())
-
+Laser = ComponentFactory("laser", ("lastfired",))

@@ -1,9 +1,16 @@
 import pygame
 
+
 from ecs.System import System
 
 from Components import *
 
+def remove_dead(ent_set):
+	dead = set()
+	for e in ent_set:
+		if e.is_dead:
+			dead.add(e)
+	ent_set.difference_update(dead)
 
 class InputSystem(System):
 	def __init__(self, world):
@@ -40,14 +47,14 @@ class InputSystem(System):
 					self.world.send_event("PlayerAttack")
 					self.lastup.pop(key)
 				else:
-					self.world.send_event("MovePlayer", dir="Up")
+					self.world.send_event("MovePlayer", dir=(0,-1))
 
 			elif (key == pygame.K_DOWN):
-				self.world.send_event("MovePlayer", dir="Down")
+				self.world.send_event("MovePlayer", dir=(0,1))
 			elif (key == pygame.K_LEFT):
-				self.world.send_event("MovePlayer", dir="Left")
+				self.world.send_event("MovePlayer", dir=(-1,0))
 			elif (key == pygame.K_RIGHT):
-				self.world.send_event("MovePlayer", dir="Right")
+				self.world.send_event("MovePlayer", dir=(1,0))
 
 			elif (key == pygame.K_SPACE):
 				self.world.send_event("MobFireLaser", mob=None)
@@ -55,6 +62,7 @@ class InputSystem(System):
 
 			elif (key == pygame.K_y):
 				print(self.world.clock.get_fps())
+				self.pressed.pop(key)
 
 		if (press_type == 'KeyUp'):
 			if self.pressed.get(key, False):
@@ -84,52 +92,120 @@ class MapSystem(System):
 	def __init__(self, world):
 		super(MapSystem, self).__init__(world)
 
-		self.load_player()
-		self.load_mobs()
+		self.world.globaldata['mapsize'] = (450, 800)
+
+		self.player = self.load_player()
+		self.mobs = self.load_mobs()
+
+	def update(self, dt):
+		remove_dead(self.mobs)
 
 	def load_player(self):
 		""" 1) need to load from a file
 			2) need to have an archtype/entity factory thing so that I can just do
 			self.player = Player() or something
 		"""
-		self.player = self.world.create_entity()
-		self.player.add_component(Type(name="badger"))
-		self.player.add_component(Controllable())
-		self.player.add_component(Position(x=200, y=600))
-		self.player.add_component(Size(width=25, height=40))
-		self.player.add_component(Color(r=0, g=0, b=0))
-		self.player.add_component(Visible())
+		player = self.world.create_entity()
+		player.add_component(Type(name="badger"))
+		player.add_component(Controllable())
+		player.add_component(Position(x=200, y=600))
+		player.add_component(MoveSpeed(x=1.5, y=1.5))
+		player.add_component(Size(width=25, height=40))
+		player.add_component(Color(r=0, g=0, b=0))
+		player.add_component(Visible())
+		player.add_component(Collidable())
 
 	def load_mobs(self):
-		self.mobs = list()
+		mobs = set()
 		m = self.world.create_entity()
 		m.add_component(Type(name="mob"))
 		m.add_component(Position(x=100, y=100))
+		m.add_component(MoveSpeed(x=1, y=1))
 		m.add_component(Size(width=20, height=20))
 		m.add_component(Color(r=20, g=20, b=20))
+		m.add_component(Laser(lastfired=0))
 		m.add_component(Visible())
 		m.add_component(Hostile())
+
+		mobs.add(m)
+		return mobs
+
+class AISystem(System):
+	def __init__(self, world):
+		super(AISystem, self).__init__(world)
+
+		self.player = None
+		
+		self.update_hostiles()
+
+		self.world.subscribe_event("ComponentAdded", self)
+
+	def receive(self, event_type, event):
+		if event_type == "ComponentAdded":
+			if event.entity.type.name == 'badger':
+				self.player = event.entity
+
+	def update(self, dt):
+		self.update_hostiles()
+
+		if self.player:
+			self.move_hostiles_towards_player()
+			self.fire_if_in_range()
+
+		remove_dead(self.hostiles)
+
+	def move_hostiles_towards_player(self):
+		for mob in self.hostiles:
+			self.move_towards_player(mob)
+
+	def move_towards_player(self, mob):
+		if self.player.position.x < mob.position.x:
+			self.world.send_event("MoveEntity", entity=mob, dir=(-1,0))
+		elif self.player.position.x > mob.position.x:
+			self.world.send_event("MoveEntity", entity=mob, dir=(1,0))
+
+	def fire_if_in_range(self):
+		for mob in self.hostiles:
+			if self.in_range(mob, self.player):
+				self.fire_laser(mob)
+
+	def in_range(self, mob, badger):
+		if abs(badger.position.x - mob.position.x) < 10:
+			self.fire_laser(mob)
+			
+	def fire_laser(self, mob):
+		if ((pygame.time.get_ticks() - mob.laser.lastfired) > 500) :
+			self.world.send_event("MobFireLaser", mob=mob)
+			mob.laser.lastfired = pygame.time.get_ticks()
+
+	def update_hostiles(self):
+		self.hostiles = self.world.entities_with_components(Hostile)
 
 class AttackSystem(System):
 	def __init__(self, world):
 		super(AttackSystem, self).__init__(world)
 
-		self.hostiles = list()
+		self.hostiles = set()
 		self.player = None
 
 		self.world.subscribe_event("MobFireLaser", self)
 		self.world.subscribe_event("ComponentAdded", self) # really should add a helper for component adding
 
+	def update(self, dt):
+		remove_dead(self.hostiles)
+
 	def receive(self, event_type, event):
 		if event_type == "ComponentAdded":
 			if event.entity.type.name == "mob":
-				self.hostiles.append(event.entity)
+				self.hostiles.add(event.entity)
 			elif event.entity.type.name == "badger":
 				self.player = event.entity
 
 		elif event_type == "MobFireLaser":
 			if event.mob == None:
 				self.fire_all_lasers()
+			else:
+				self.fire_laser(event.mob)
 
 		elif event_type == "PlayerAttack":
 			pass
@@ -148,7 +224,7 @@ class AttackSystem(System):
 		b.add_component(Type(name="laser"))
 		b.add_component(Size(width=size[0], height=size[1]))
 		b.add_component(Position(x=start[0]-(size[0]/2), y=start[1]-(size[1]/2)))
-		b.add_component(Velocity(x=direction[0], y=direction[1]))
+		b.add_component(MoveSpeed(x=direction[0], y=direction[1]))
 		b.add_component(Color(r=255, g=0, b=0))
 		b.add_component(Visible())
 		b.add_component(Collidable())
@@ -158,28 +234,39 @@ class LaserSystem(System):
 		super(LaserSystem, self).__init__(world)
 
 		self.world.subscribe_event("ComponentAdded", self)
+		self.world.subscribe_event("CollisionDetected", self)
+		# I should probably filter these closer to the source
+		# by passing some parameters, like a filter dict or something 
 
-		self.lasers = list()
+		self.lasers = set()
 
 	def receive(self, event_type, event):
 		if event_type == "ComponentAdded":
 			if event.compname == "type" and event.entity.type.name == "laser":
-				self.lasers.append(event.entity)
+				self.lasers.add(event.entity)
+		elif event_type == "CollisionDetected":
+			# assume the second entity is the laser
+			event.entity2.is_dead = True
 
 	def update(self, dt):
 		for laser in self.lasers:
 			self.move_laser(laser)
-			# see, there needs to be some global way of accessing other systems' data 
-			# perhaps the world object could just have a dict called "globaldata" and systems can add to it
-			# could even then put mutexes on it if i wanted to run the systems in different threads or something stupid
+			self.check_out_of_bounds(laser)
+
+		remove_dead(self.lasers)
 
 	def move_laser(self, laser):
 		# not sure if i want this to be in the MovementSystem or if that should just be for player and maybe mob movement
-		laser.position.x += laser.velocity.x
-		laser.position.y += laser.velocity.y
+		self.world.send_event("MoveEntity", entity=laser, dir=(0,1))
 
-		#self.world.send_event("MovedEntity", laser)
-		# rather than above I think I'll just have a collision system that checks all objects for collisions at the end of each frame
+	def check_out_of_bounds(self, laser):
+		bounds = self.world.globaldata['mapsize']
+		if laser.position.x < 0 or laser.position.x > bounds[0]:
+			laser.is_dead = True
+		elif 0 > laser.position.y or laser.position.y > bounds[1]:
+			laser.is_dead = True
+		if laser.is_dead:
+			self.world.send_event("EntityDeath", entity=laser)
 
 class MovementSystem(System):
 	def __init__(self, world):
@@ -189,6 +276,7 @@ class MovementSystem(System):
 
 		self.world.subscribe_event("ComponentAdded", self)
 		self.world.subscribe_event("MovePlayer", self)
+		self.world.subscribe_event("MoveEntity", self)
 
 	def receive(self, event_type, event):
 		if event_type == "ComponentAdded":
@@ -196,19 +284,54 @@ class MovementSystem(System):
 				self.player = event.entity
 
 		elif event_type == "MovePlayer": 
-			self.move_player(event.dir)
+			self.move_entity(self.player, event.dir)
+
+		elif event_type == "MoveEntity":
+			self.move_entity(event.entity, event.dir)
 	
-	def move_player(self, dir):
+	def move_entity(self, e, dir):
 		# this needs to be changed probably at the same time as the input system
 		# so that we move based on dt. 
-		if dir == "Up":
-			self.player.position.y -= 1.5
-		elif dir == "Down":
-			self.player.position.y += 1.5
-		elif dir == "Left":
-			self.player.position.x -= 1.5
-		elif dir == "Right":
-			self.player.position.x += 1.5
+		e.position.x += e.movespeed.x * dir[0]
+		e.position.y += e.movespeed.y * dir[1]
+
+class CollisionSystem(System):
+	""" right now just checks for collision between lasers and badgers """
+	def __init__(self, world):
+		super(CollisionSystem, self).__init__(world)
+
+		self.world.subscribe_event("ComponentAdded", self)
+
+		self.collidables = self.world.entities_with_components(Collidable) 
+
+		self.badgers = set()
+
+	def receive(self, event_type, event):
+		if event_type == "ComponentAdded":
+			if event.entity.type.name == "badger":
+				self.badgers.add(event.entity)
+			if event.compname == "collidable":
+				# non-badger collidables, should really check typename lasers
+				self.collidables.add(event.entity)
+
+	def update(self, dt):
+		for b in self.badgers:
+			for e in self.collidables-self.badgers:
+				if self.check_collision(b, e):
+					self.world.send_event("CollisionDetected", entity1=b, entity2=e)
+
+		remove_dead(self.collidables)
+
+	def check_collision(self, b, e):
+		""" should abstract out the bounding box or something.
+			it is sufficiently abstracted now so that changes only affect this function though
+		"""
+
+		r1 = pygame.Rect(b.position.x, b.position.y, b.size.width, b.size.height)
+		r2 = pygame.Rect(e.position.x, e.position.y, e.size.width, e.size.height)
+		return r1.colliderect(r2)
+			
+
 
 class RenderSystem(System):
 	CLEARCOLOR = (237, 201, 175) # "desert sand"
@@ -243,7 +366,7 @@ class RenderSystem(System):
 		self.renderables = self.world.entities_with_components(Position, Size, Color, Visible, PygameSurf)
 
 	def init_pygame(self):
-		self.screen_size = self.width, self.height = 450, 800 # need some sort of options system or something? I guess really I should read from a config file
+		self.screen_size = self.width, self.height = self.world.globaldata['mapsize']
 		self.screen = pygame.display.set_mode(self.screen_size)
 
 	def create_sprite(self, entity):
@@ -257,11 +380,12 @@ class RenderSystem(System):
 			self.screen.blit(sprite.pygamesurf.surface, (sprite.position.x, sprite.position.y))
 
 	def update(self, dt):
-		#rather than doing this each frame, I should do it when an entity is created or something
+	
+		remove_dead(self.renderables)	
 
 		self.screen.fill(self.CLEARCOLOR)
 		self.render_sprites(dt)
 		pygame.display.flip()
 
 #systems = (InputSystem, MovementSystem, RenderSystem)
-systems = (InputSystem, MapSystem, AttackSystem, LaserSystem, MovementSystem, RenderSystem)
+systems = (InputSystem, MapSystem, AISystem, AttackSystem, LaserSystem, MovementSystem, CollisionSystem, RenderSystem)
