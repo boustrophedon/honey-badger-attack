@@ -4,7 +4,7 @@ from honeybadger.ecs.System import System
 
 from honeybadger.Components import *
 
-from util import remove_dead
+from syst_util import remove_dead
 
 class AISystem(System):
 	def __init__(self, world):
@@ -14,12 +14,11 @@ class AISystem(System):
 		
 		self.update_hostiles()
 
-		self.world.subscribe_event("ComponentAdded", self)
+		self.world.subscribe_event("ComponentAdded", self.onComponentAdded)
 
-	def receive(self, event_type, event):
-		if event_type == "ComponentAdded":
-			if event.entity.type.name == 'badger':
-				self.player = event.entity
+	def onComponentAdded(self, event_type, event):
+		if event.entity.type.name == 'badger':
+			self.player = event.entity
 
 	def update(self, dt):
 		self.update_hostiles()

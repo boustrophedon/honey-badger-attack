@@ -4,7 +4,7 @@ from honeybadger.ecs.System import System
 
 from honeybadger.Components import *
 
-from util import remove_dead
+from syst_util import remove_dead
 
 class RenderSystem(System):
 	CLEARCOLOR = (237, 201, 175) # "desert sand"
@@ -16,10 +16,10 @@ class RenderSystem(System):
 
 		self.update_renderables()
 
-		self.world.subscribe_event("ComponentAdded", self)
+		self.world.subscribe_event("ComponentAdded", self.onComponentAdded)
 
-	def receive(self, event_type, event):
-		if event_type == "ComponentAdded" and event.compname == "visible":
+	def onComponentAdded(self, event_type, event):
+		if event.compname == "visible":
 			e = event.entity
 			if e.has_components(Position, Size, Color):
 				self.create_sprite(e)

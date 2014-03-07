@@ -4,6 +4,19 @@ from collections import defaultdict
 
 from Entity import Entity
 
+def check_event_matches(event, matches):
+	""" I don't really know why I felt this shouldn't be a class method of world
+		but it feels like it shouldn't.
+		I also feel like there should be a much more pythonic way to do this
+		or at least using like filter() or something
+	"""
+	if matches is None:
+		return True
+	for k,v in matches.items():
+		if not (hasattr(event, k) and getattr(event,k) == v):
+			return False
+	return True
+
 class World(object):
 	def __init__(self):
 		pygame.init()
@@ -45,20 +58,24 @@ class World(object):
 			syst.update(dt) # should maybe add a tickrate to the systems
 							# alt, give each system its own clock then can call clock.tick(sysfps)
 
-	def subscribe_event(self, event_type, syst):
-		self.event_subs[event_type].append(syst)
+	def subscribe_event(self, event_type, event_callback, matches=None):
+		self.event_subs[event_type].append((event_callback, matches))
 
 	def send_event(self, event_type, **kwargs):
 		pygame.event.post(pygame.event.Event(pygame.USEREVENT, typename=event_type, **kwargs))
 
+	def process_event(self, event):
+		event_type = pygame.event.event_name(event.type)
+		if event_type == 'UserEvent':
+			event_type = event.typename
+
+		for callback,matches in self.event_subs[event_type]:
+			if check_event_matches(event, matches):
+				callback(event_type, event)
+
 	def process_events(self):
 		for event in pygame.event.get():
-			event_type = pygame.event.event_name(event.type)
-			if event_type == 'UserEvent':
-				event_type = event.typename
-
-			for syst in self.event_subs[event_type]:
-				syst.receive(event_type, event)
+			self.process_event(event)
 
 	def run(self):
 		while not self.stop:

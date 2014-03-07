@@ -4,25 +4,25 @@ from honeybadger.ecs.System import System
 
 from honeybadger.Components import *
 
-from util import remove_dead
+from syst_util import remove_dead
 
 class LaserSystem(System):
 	def __init__(self, world):
 		super(LaserSystem, self).__init__(world)
 
-		self.world.subscribe_event("ComponentAdded", self)
-		self.world.subscribe_event("CollisionDetected", self)
-		# I should probably filter these closer to the source
-		# by passing some parameters, like a filter dict or something 
+		self.world.subscribe_event("ComponentAdded", self.onComponentAdded)
+		self.world.subscribe_event("CollisionDetected", self.onCollisionDetected)
 
 		self.lasers = set()
 
-	def receive(self, event_type, event):
-		if event_type == "ComponentAdded":
-			if event.compname == "type" and event.entity.type.name == "laser":
-				self.lasers.add(event.entity)
-		elif event_type == "CollisionDetected":
-			# assume the second entity is the laser
+	def onComponentAdded(self, event_type, event):
+		if event.compname == "type" and event.entity.type.name == "laser":
+			self.lasers.add(event.entity)
+
+	def onCollisionDetected(self, event_type, event):
+		if event.entity1.type.name == 'laser': 
+			event.entity1.is_dead = True
+		elif event.entity2.type.name == 'laser': 
 			event.entity2.is_dead = True
 
 	def update(self, dt):

@@ -7,8 +7,5 @@ class System(object):
 	def update(self, dt):
 		pass
 
-	def receive(self, event_type, event):
-		pass
-
 	def stop(self):
 		pass

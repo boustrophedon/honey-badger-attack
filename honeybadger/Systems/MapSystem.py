@@ -4,7 +4,7 @@ from honeybadger.ecs.System import System
 
 from honeybadger.Components import *
 
-from util import remove_dead
+from syst_util import remove_dead
 
 class MapSystem(System):
 	""" not really sure if this is a good idea. handles loading the map?

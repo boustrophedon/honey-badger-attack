@@ -4,7 +4,7 @@ from honeybadger.ecs.System import System
 
 from honeybadger.Components import *
 
-from util import remove_dead
+from syst_util import remove_dead
 
 class MovementSystem(System):
 	def __init__(self, world):
@@ -12,20 +12,19 @@ class MovementSystem(System):
 
 		self.player = None
 
-		self.world.subscribe_event("ComponentAdded", self)
-		self.world.subscribe_event("MovePlayer", self)
-		self.world.subscribe_event("MoveEntity", self)
+		self.world.subscribe_event("ComponentAdded", self.onComponentAdded)
+		self.world.subscribe_event("MovePlayer", self.onMovePlayer)
+		self.world.subscribe_event("MoveEntity", self.onMoveEntity)
 
-	def receive(self, event_type, event):
-		if event_type == "ComponentAdded":
-			if event.compname == "controllable":
-				self.player = event.entity
+	def onComponentAdded(self, event_type, event):
+		if event.compname == "controllable":
+			self.player = event.entity
 
-		elif event_type == "MovePlayer": 
-			self.move_entity(self.player, event.dir)
+	def onMovePlayer(self, event_type, event):
+		self.move_entity(self.player, event.dir)
 
-		elif event_type == "MoveEntity":
-			self.move_entity(event.entity, event.dir)
+	def onMoveEntity(self, event_type, event):
+		self.move_entity(event.entity, event.dir)
 	
 	def move_entity(self, e, dir):
 		# this needs to be changed probably at the same time as the input system
