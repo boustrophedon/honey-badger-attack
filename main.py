@@ -1,8 +1,6 @@
-from ecs.World import World
-from ecs.Entity import Entity
-from ecs.Component import ComponentFactory as Comp
+from honeybadger.ecs.World import World
 
-from Systems import *
+from honeybadger.Systems import systems
 
 if __name__ == '__main__':
 	w = World()
